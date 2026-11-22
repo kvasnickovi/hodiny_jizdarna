@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5a8240">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Hodiny – jízdárna</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(circle at 50% 45%, #6f9b48 0%, #5a8240 55%, #476b32 100%);
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* jemná textura trávy přes celou stránku */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12  0 0 0 0 .26  0 0 0 0 .06  0 0 0 .55 -.18'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .stage {
+    position: fixed; inset: 0;
+    display: grid; place-items: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .clock {
+    position: relative;
+    width: min(100vw, 100dvh);
+    aspect-ratio: 1;
+  }
+  .clock svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .num {
+    font-family: "Avenir Next", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-weight: 600; font-size: 12.5px; fill: #fbf4e0;
+    stroke: rgba(30, 50, 20, .55); stroke-width: 2.6px; paint-order: stroke;
+    text-anchor: middle;
+  }
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="clock" id="clock" role="img" aria-label="Analogové hodiny">
+
+    <!-- statická vrstva: tráva, písek, ohrada, číslice -->
+    <svg id="bg" viewBox="-142 -142 284 284" aria-hidden="true">
+      <defs>
+        <radialGradient id="sandG" cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#e8d2a2"/>
+          <stop offset=".7" stop-color="#dcc08a"/>
+          <stop offset="1" stop-color="#cdab70"/>
+        </radialGradient>
+        <filter id="grain" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="1.2" numOctaves="2" seed="7"/>
+          <feColorMatrix values="0 0 0 0 .42  0 0 0 0 .30  0 0 0 0 .15  0 0 0 1.1 -.42"/>
+        </filter>
+        <clipPath id="sandClip"><circle r="100"/></clipPath>
+      </defs>
+      <circle r="104.5" cx="2.5" cy="3.5" fill="none" stroke="rgba(20,35,10,.35)" stroke-width="6"/>
+      <circle r="100" fill="url(#sandG)"/>
+      <g clip-path="url(#sandClip)">
+        <rect x="-100" y="-100" width="200" height="200" filter="url(#grain)" opacity=".55"/>
+        <g id="rake" fill="none" stroke="rgba(110,80,40,.11)" stroke-width="1.1"></g>
+        <circle r="66" fill="none" stroke="#a98852" stroke-width="15" opacity=".16"/>
+        <circle r="10" fill="#b8955a" opacity=".3"/>
+      </g>
+      <circle r="98" fill="none" stroke="rgba(70,45,20,.3)" stroke-width="4"/>
+      <g id="fence"></g>
+      <g id="ticks" stroke="#f5efd9" stroke-linecap="round" opacity=".9"></g>
+      <g id="nums"></g>
+    </svg>
+
+    <!-- pohyblivá vrstva: tyče (hodinová a minutová ručička), trenér, lonž, kůň -->
+    <svg id="fg" viewBox="-142 -142 284 284" aria-hidden="true">
+      <defs>
+        <pattern id="pRed" width="12" height="8" patternUnits="userSpaceOnUse">
+          <rect width="6" height="8" fill="#c23b2e"/><rect x="6" width="6" height="8" fill="#f3ede0"/>
+        </pattern>
+        <pattern id="pBlue" width="12" height="8" patternUnits="userSpaceOnUse">
+          <rect width="6" height="8" fill="#2f5f9e"/><rect x="6" width="6" height="8" fill="#f3ede0"/>
+        </pattern>
+        <linearGradient id="bay" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#5a3016"/>
+          <stop offset=".5" stop-color="#8a5530"/>
+          <stop offset="1" stop-color="#5a3016"/>
+        </linearGradient>
+      </defs>
+
+      <!-- stíny tyčí -->
+      <g fill="#2b1a0a" opacity=".28">
+        <rect id="hSh" x="-6" y="-2.6" width="42" height="5.2" rx="2.4"/>
+        <rect id="mSh" x="-8" y="-1.9" width="62" height="3.8" rx="1.8"/>
+      </g>
+      <!-- hodinová tyč (modrobílá) a minutová tyč (červenobílá) -->
+      <g id="hPole">
+        <rect x="-6" y="-2.6" width="42" height="5.2" rx="2.4" fill="url(#pBlue)"/>
+        <rect x="-6" y="-2.6" width="42" height="5.2" rx="2.4" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".5"/>
+      </g>
+      <g id="mPole">
+        <rect x="-8" y="-1.9" width="62" height="3.8" rx="1.8" fill="url(#pRed)"/>
+        <rect x="-8" y="-1.9" width="62" height="3.8" rx="1.8" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".5"/>
+      </g>
+
+      <!-- stín trenéra -->
+      <g id="trSh" fill="#000" opacity=".26">
+        <ellipse rx="4.6" ry="9.8"/><circle cx=".3" r="4.8"/>
+      </g>
+
+      <!-- lonž (sekundová ručička) -->
+      <line id="lineSh" stroke="rgba(0,0,0,.25)" stroke-width="1.1" stroke-linecap="round"/>
+      <line id="line" stroke="#f3ecd8" stroke-width="1.1" stroke-linecap="round"/>
+
+      <!-- trenér, pohled shora -->
+      <g id="trainer">
+        <line x1="0" y1="7.5" x2="9" y2="3.6" stroke="#34557f" stroke-width="3.2" stroke-linecap="round"/>
+        <line x1="0" y1="-7.5" x2="7" y2="-5.6" stroke="#34557f" stroke-width="3.2" stroke-linecap="round"/>
+        <ellipse rx="4.6" ry="9.8" fill="#3d6191" stroke="#25405f" stroke-width=".6"/>
+        <circle cx="9" cy="3.6" r="1.7" fill="#e8b896"/>
+        <circle cx="7" cy="-5.6" r="1.7" fill="#e8b896"/>
+        <circle cx="9.6" cy="-6.6" r="2.7" fill="none" stroke="#f3ecd8" stroke-width=".9"/>
+        <circle cx="9.6" cy="-6.6" r="1.6" fill="none" stroke="#f3ecd8" stroke-width=".8"/>
+        <circle cx=".3" r="4.8" fill="#1f2430"/>
+        <ellipse cx="3.8" rx="2.1" ry="3.5" fill="#151922"/>
+        <circle cx="-1" cy="-1.6" r="1.3" fill="rgba(255,255,255,.22)"/>
+      </g>
+
+      <!-- stín koně -->
+      <g id="horseSh" fill="#000" opacity=".24">
+        <path d="M-40 0 C-40 -12 -30 -15 -18 -14 C-6 -13 6 -14 18 -13 C28 -12 32 -8 34 -4 L34 4 C32 8 28 12 18 13 C6 14 -6 13 -18 14 C-30 15 -40 12 -40 0Z"/>
+        <path d="M30 -6.5 C40 -6 46 -5 53 -4.5 L52 5 C46 7 40 8 30 7Z"/>
+        <path d="M52 -4.5 C62 -5 72 -2.5 82 1.5 C85 3 85 7 82 8 C72 9 62 10 52 5Z"/>
+      </g>
+
+      <!-- kůň, pohled shora (hlavou doprava) -->
+      <g id="horse">
+        <g id="legs" fill="#2c170d">
+          <rect id="lHL" x="-5" y="-2" width="10" height="4" rx="2"/>
+          <rect id="lFL" x="-5" y="-2" width="10" height="4" rx="2"/>
+          <rect id="lHR" x="-5" y="-2" width="10" height="4" rx="2"/>
+          <rect id="lFR" x="-5" y="-2" width="10" height="4" rx="2"/>
+        </g>
+        <g id="tail" fill="#26140c">
+          <path d="M-38 -1 C-52 -5 -64 -3 -76 5 C-64 4 -54 9 -38 4 Z"/>
+        </g>
+        <path d="M-40 0 C-40 -12 -30 -15 -18 -14 C-6 -13 6 -14 18 -13 C28 -12 32 -8 34 -4 L34 4 C32 8 28 12 18 13 C6 14 -6 13 -18 14 C-30 15 -40 12 -40 0Z" fill="url(#bay)"/>
+        <ellipse cx="-4" cy="0" rx="30" ry="5.5" fill="#ffd9a0" opacity=".16"/>
+        <g id="neckg">
+          <path d="M30 -6.5 C40 -6 46 -5 53 -4.5 L52 5 C46 7 40 8 30 7Z" fill="url(#bay)"/>
+          <path d="M30 -1.5 C40 -1 46 -.5 53 -.5 L53 1.8 C46 1.8 40 2.2 30 2.2Z" fill="#26140c"/>
+          <path d="M52 -4.5 C62 -5 72 -2.5 82 1.5 C85 3 85 7 82 8 C72 9 62 10 52 5Z" fill="url(#bay)"/>
+          <ellipse cx="55" cy="-2.6" rx="3.1" ry="1.3" transform="rotate(-10 55 -2.6)" fill="#3b2012"/>
+          <ellipse cx="55" cy="3.6" rx="3.1" ry="1.3" transform="rotate(10 55 3.6)" fill="#3b2012"/>
+          <ellipse cx="81" cy="5.2" rx="3.2" ry="2.6" fill="#4a2a1a"/>
+          <path d="M72.5 -1 C74 3 74 6 72.8 9.2" fill="none" stroke="#1b1b1b" stroke-width="1.1"/>
+          <circle cx="75" cy="8.8" r="1.4" fill="#d3b87a"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+</main>
+
+<script>
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = id => document.getElementById(id);
+  function mk(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    parent.appendChild(e);
+    return e;
+  }
+  const rad = d => d * Math.PI / 180;
+
+  /* ---------- statické pozadí ---------- */
+  (function buildBackground() {
+    // zarovnaný písek
+    const rake = $("rake");
+    for (let r = 12; r <= 96; r += 4) mk("circle", { r }, rake);
+
+    // ohrada: horní prkno, okraje, spáry prken a sloupky
+    const fence = $("fence");
+    mk("circle", { r: 104.5, fill: "none", stroke: "#a5713b", "stroke-width": 6 }, fence);
+    mk("circle", { r: 101.6, fill: "none", stroke: "#6d4521", "stroke-width": .7 }, fence);
+    mk("circle", { r: 107.4, fill: "none", stroke: "#6d4521", "stroke-width": .7 }, fence);
+    mk("circle", { r: 105.6, fill: "none", stroke: "#c08d55", "stroke-width": 1.2, opacity: .7 }, fence);
+    for (let a = 0; a < 360; a += 7.5) {
+      const c = Math.cos(rad(a)), s = Math.sin(rad(a));
+      mk("line", { x1: 101.6 * c, y1: 101.6 * s, x2: 107.4 * c, y2: 107.4 * s,
+                   stroke: "rgba(60,35,15,.55)", "stroke-width": .5 }, fence);
+    }
+    for (let h = 0; h < 12; h++) {
+      const a = rad(h * 30 - 90), x = 104.5 * Math.cos(a), y = 104.5 * Math.sin(a);
+      mk("circle", { cx: x + 1, cy: y + 1.4, r: 4.6, fill: "rgba(20,10,0,.3)" }, fence);
+      mk("circle", { cx: x, cy: y, r: 4.6, fill: "#6f4522" }, fence);
+      mk("circle", { cx: x, cy: y, r: 2.9, fill: "#b88a55" }, fence);
+    }
+
+    // minutové rysky a číslice mimo ohradu
+    const ticks = $("ticks");
+    for (let m = 0; m < 60; m++) {
+      const big = m % 5 === 0, a = rad(m * 6 - 90);
+      const r1 = 112, r2 = big ? 117 : 114.5;
+      mk("line", { x1: r1 * Math.cos(a), y1: r1 * Math.sin(a), x2: r2 * Math.cos(a), y2: r2 * Math.sin(a),
+                   "stroke-width": big ? 1.6 : .8 }, ticks);
+    }
+    const nums = $("nums");
+    for (let h = 1; h <= 12; h++) {
+      const a = rad(h * 30 - 90);
+      const t = mk("text", { x: 129 * Math.cos(a), y: 129 * Math.sin(a) + 4.4, class: "num" }, nums);
+      t.textContent = h;
+    }
+  })();
+
+  /* ---------- pohyblivá vrstva ---------- */
+  const LINE_R = 66;           // délka lonže
+  const SCALE = 0.47;          // velikost koně
+  const ATTACH = [75, 8.8];    // karabina na ohlávce
+  const BEND = 0.5;            // zakřivení koně po kruhu
+  const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const legs = [
+    [$("lHL"), -26, -14, 0.00],
+    [$("lFL"),  22, -14, 0.25],
+    [$("lHR"), -26,  14, 0.50],
+    [$("lFR"),  22,  14, 0.75]
+  ];
+  let lastLabel = "";
+
+  function frame() {
+    const d = new Date();
+    const ms = REDUCE ? 0 : d.getMilliseconds();
+    const sec = d.getSeconds() + ms / 1000;
+    const min = d.getMinutes() + sec / 60;
+    const hr = (d.getHours() % 12) + min / 60;
+
+    const aS = sec * 6 - 90, aM = min * 6 - 90, aH = hr * 30 - 90;
+    const th = rad(aS);
+
+    // tyče
+    $("hPole").setAttribute("transform", `rotate(${aH})`);
+    $("mPole").setAttribute("transform", `rotate(${aM})`);
+    $("hSh").setAttribute("transform", `translate(2.4 3.4) rotate(${aH})`);
+    $("mSh").setAttribute("transform", `translate(2.4 3.4) rotate(${aM})`);
+
+    // trenér se otáčí za koněm
+    $("trainer").setAttribute("transform", `rotate(${aS})`);
+    $("trSh").setAttribute("transform", `translate(2.2 3.2) rotate(${aS})`);
+
+    // lonž: od ruky trenéra ke karabině na hlavě koně
+    const hx = 9 * Math.cos(th) - 3.6 * Math.sin(th);
+    const hy = 9 * Math.sin(th) + 3.6 * Math.cos(th);
+    const Hx = LINE_R * Math.cos(th), Hy = LINE_R * Math.sin(th);
+    const L = $("line"), LS = $("lineSh");
+    L.setAttribute("x1", hx);  L.setAttribute("y1", hy);  L.setAttribute("x2", Hx);  L.setAttribute("y2", Hy);
+    LS.setAttribute("x1", hx + 1.6); LS.setAttribute("y1", hy + 2.4); LS.setAttribute("x2", Hx + 1.6); LS.setAttribute("y2", Hy + 2.4);
+
+    // kůň: hlava u konce lonže, tělo se táhne za ní po kruhu
+    const hd = th + Math.PI / 2 - BEND;
+    const ax = ATTACH[0] * SCALE, ay = ATTACH[1] * SCALE;
+    const bx = Hx - (ax * Math.cos(hd) - ay * Math.sin(hd));
+    const by = Hy - (ax * Math.sin(hd) + ay * Math.cos(hd));
+    const deg = hd * 180 / Math.PI;
+    $("horse").setAttribute("transform", `translate(${bx} ${by}) rotate(${deg}) scale(${SCALE})`);
+    $("horseSh").setAttribute("transform", `translate(${bx + 2.2} ${by + 3.2}) rotate(${deg}) scale(${SCALE})`);
+
+    // chůze: nohy v kroku, kývání hlavou a ocasem
+    const phase = REDUCE ? 0 : (d.getTime() / 1000) * 2 * Math.PI / 1.6;
+    for (const [el, x, y, off] of legs) {
+      el.setAttribute("transform", `translate(${x + 7 * Math.sin(phase + off * 2 * Math.PI)} ${y})`);
+    }
+    $("neckg").setAttribute("transform", `rotate(${1.8 * Math.sin(phase * 2)} 30 0)`);
+    $("tail").setAttribute("transform", `rotate(${8 * Math.sin(phase * 0.5 + 1)} -38 0)`);
+
+    // popisek pro čtečky
+    const label = "Je " + d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
+    if (label !== lastLabel) { $("clock").setAttribute("aria-label", label); lastLabel = label; }
+
+    if (REDUCE) setTimeout(frame, 1000 - new Date().getMilliseconds());
+    else requestAnimationFrame(frame);
+  }
+  frame();
+</script>
+</body>
+</html>
