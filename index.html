@@ -18,6 +18,7 @@
     content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .5;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12  0 0 0 0 .26  0 0 0 0 .06  0 0 0 .55 -.18'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
   }
+  #lawn { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .stage {
     position: fixed; inset: 0;
     display: grid; place-items: center;
@@ -28,6 +29,11 @@
     width: min(100vw, 100dvh);
     aspect-ratio: 1;
   }
+  .clock {
+    touch-action: none; cursor: crosshair;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .clock canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .clock svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .num {
     font-family: "Avenir Next", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -38,6 +44,7 @@
 </style>
 </head>
 <body>
+<canvas id="lawn" aria-hidden="true"></canvas>
 <main class="stage">
   <div class="clock" id="clock" role="img" aria-label="Analogové hodiny">
 
@@ -60,7 +67,7 @@
       <g clip-path="url(#sandClip)">
         <rect x="-100" y="-100" width="200" height="200" filter="url(#grain)" opacity=".55"/>
         <g id="rake" fill="none" stroke="rgba(110,80,40,.11)" stroke-width="1.1"></g>
-        <circle r="66" fill="none" stroke="#a98852" stroke-width="15" opacity=".16"/>
+        <circle r="84" fill="none" stroke="#a98852" stroke-width="15" opacity=".16"/>
         <circle r="10" fill="#b8955a" opacity=".3"/>
       </g>
       <circle r="98" fill="none" stroke="rgba(70,45,20,.3)" stroke-width="4"/>
@@ -68,6 +75,9 @@
       <g id="ticks" stroke="#f5efd9" stroke-linecap="round" opacity=".9"></g>
       <g id="nums"></g>
     </svg>
+
+    <!-- šmouhy v písku (kreslení myší / prstem) -->
+    <canvas id="smudge" aria-hidden="true"></canvas>
 
     <!-- pohyblivá vrstva: tyče (hodinová a minutová ručička), trenér, lonž, kůň -->
     <svg id="fg" viewBox="-142 -142 284 284" aria-hidden="true">
@@ -83,21 +93,28 @@
           <stop offset=".5" stop-color="#8a5530"/>
           <stop offset="1" stop-color="#5a3016"/>
         </linearGradient>
+        <g id="shoe" fill="none" stroke-linecap="round" stroke-width="1.2">
+          <path d="M-2.1 -2.1 C.8 -2.9 2.5 -1.5 2.5 0 C2.5 1.5 .8 2.9 -2.1 2.1" stroke="#fff3d6" stroke-opacity=".5" transform="translate(.45 .45)"/>
+          <path d="M-2.1 -2.1 C.8 -2.9 2.5 -1.5 2.5 0 C2.5 1.5 .8 2.9 -2.1 2.1" stroke="#6b4721"/>
+        </g>
       </defs>
+
+      <!-- otisky kopyt v písku -->
+      <g id="prints"></g>
 
       <!-- stíny tyčí -->
       <g fill="#2b1a0a" opacity=".28">
-        <rect id="hSh" x="-6" y="-2.6" width="42" height="5.2" rx="2.4"/>
-        <rect id="mSh" x="-8" y="-1.9" width="62" height="3.8" rx="1.8"/>
+        <rect id="hSh" x="-6" y="-2.6" width="60" height="5.2" rx="2.4"/>
+        <rect id="mSh" x="-8" y="-1.9" width="80" height="3.8" rx="1.8"/>
       </g>
       <!-- hodinová tyč (modrobílá) a minutová tyč (červenobílá) -->
       <g id="hPole">
-        <rect x="-6" y="-2.6" width="42" height="5.2" rx="2.4" fill="url(#pBlue)"/>
-        <rect x="-6" y="-2.6" width="42" height="5.2" rx="2.4" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".5"/>
+        <rect x="-6" y="-2.6" width="60" height="5.2" rx="2.4" fill="url(#pBlue)"/>
+        <rect x="-6" y="-2.6" width="60" height="5.2" rx="2.4" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".5"/>
       </g>
       <g id="mPole">
-        <rect x="-8" y="-1.9" width="62" height="3.8" rx="1.8" fill="url(#pRed)"/>
-        <rect x="-8" y="-1.9" width="62" height="3.8" rx="1.8" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".5"/>
+        <rect x="-8" y="-1.9" width="80" height="3.8" rx="1.8" fill="url(#pRed)"/>
+        <rect x="-8" y="-1.9" width="80" height="3.8" rx="1.8" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".5"/>
       </g>
 
       <!-- stín trenéra -->
@@ -190,7 +207,7 @@
       const a = rad(h * 30 - 90), x = 104.5 * Math.cos(a), y = 104.5 * Math.sin(a);
       mk("circle", { cx: x + 1, cy: y + 1.4, r: 4.6, fill: "rgba(20,10,0,.3)" }, fence);
       mk("circle", { cx: x, cy: y, r: 4.6, fill: "#6f4522" }, fence);
-      mk("circle", { cx: x, cy: y, r: 2.9, fill: "#b88a55" }, fence);
+      mk("circle", { cx: x, cy: y, r: 2.9, fill: "#f4c91f", stroke: "#c99a0a", "stroke-width": .5 }, fence);
     }
 
     // minutové rysky a číslice mimo ohradu
@@ -210,7 +227,7 @@
   })();
 
   /* ---------- pohyblivá vrstva ---------- */
-  const LINE_R = 66;           // délka lonže
+  const LINE_R = 84;           // délka lonže
   const SCALE = 0.47;          // velikost koně
   const ATTACH = [75, 8.8];    // karabina na ohlávce
   const BEND = 0.5;            // zakřivení koně po kruhu
@@ -222,17 +239,77 @@
     [$("lHR"), -26,  14, 0.50],
     [$("lFR"),  22,  14, 0.75]
   ];
+  const STRIDE_MS = 1600;      // jeden krokový cyklus
+  const TRAIL_SEC = 15;        // stopa za koněm = 3 hodiny na ciferníku (90°)
+  const printsG = $("prints");
+  const prints = [];
+  const nextK = legs.map(() => 0);
   let lastLabel = "";
 
+  // poloha koně a lonže v daném čase
+  function pose(ms) {
+    const d = new Date(ms);
+    const sec = d.getSeconds() + d.getMilliseconds() / 1000;
+    const th = rad(sec * 6 - 90);
+    const Hx = LINE_R * Math.cos(th), Hy = LINE_R * Math.sin(th);
+    const hd = th + Math.PI / 2 - BEND;
+    const ax = ATTACH[0] * SCALE, ay = ATTACH[1] * SCALE;
+    const bx = Hx - (ax * Math.cos(hd) - ay * Math.sin(hd));
+    const by = Hy - (ax * Math.sin(hd) + ay * Math.cos(hd));
+    return { sec, th, Hx, Hy, hd, bx, by };
+  }
+
+  // otisk podkovy v místě, kde noha v čase t došlápla
+  function dropPrint(i, t) {
+    const [, x, y] = legs[i];
+    const p = pose(t);
+    const lx = SCALE * (x + 7), ly = SCALE * y;
+    const wx = p.bx + lx * Math.cos(p.hd) - ly * Math.sin(p.hd);
+    const wy = p.by + lx * Math.sin(p.hd) + ly * Math.cos(p.hd);
+    const ang = (Math.atan2(wy, wx) + Math.PI / 2) * 180 / Math.PI; // směr chůze po kruhu
+    const u = document.createElementNS(NS, "use");
+    u.setAttribute("href", "#shoe");
+    u.setAttribute("transform", `translate(${wx.toFixed(2)} ${wy.toFixed(2)}) rotate(${ang.toFixed(1)})`);
+    u.style.opacity = 0;
+    printsG.appendChild(u);
+    prints.push({ el: u, t });
+  }
+
+  function updatePrints(nowMs) {
+    const from = nowMs - TRAIL_SEC * 1000;
+    legs.forEach((lg, i) => {
+      const off = lg[3];
+      // došlápnutí nastává v časech STRIDE * (k + 1/4 - off)
+      const kMin = Math.ceil(from / STRIDE_MS - 0.25 + off);
+      if (nextK[i] < kMin) nextK[i] = kMin;
+      for (;;) {
+        const t = STRIDE_MS * (nextK[i] + 0.25 - off);
+        if (t > nowMs) break;
+        dropPrint(i, t);
+        nextK[i]++;
+      }
+    });
+    for (let j = prints.length - 1; j >= 0; j--) {
+      const pr = prints[j];
+      const age = (nowMs - pr.t) / 1000;
+      if (age > TRAIL_SEC) { pr.el.remove(); prints.splice(j, 1); continue; }
+      const fadeIn = Math.min(1, age / 0.25);
+      const fadeOut = Math.min(1, (TRAIL_SEC - age) / 6);   // nejstarší otisky mizí
+      pr.el.style.opacity = (0.85 * fadeIn * fadeOut).toFixed(3);
+    }
+  }
+
   function frame() {
-    const d = new Date();
-    const ms = REDUCE ? 0 : d.getMilliseconds();
-    const sec = d.getSeconds() + ms / 1000;
+    const real = Date.now();
+    const nowMs = REDUCE ? Math.floor(real / 1000) * 1000 : real;
+    const d = new Date(nowMs);
+    const p = pose(nowMs);
+    const sec = p.sec;
     const min = d.getMinutes() + sec / 60;
     const hr = (d.getHours() % 12) + min / 60;
-
     const aS = sec * 6 - 90, aM = min * 6 - 90, aH = hr * 30 - 90;
-    const th = rad(aS);
+
+    updatePrints(nowMs);
 
     // tyče
     $("hPole").setAttribute("transform", `rotate(${aH})`);
@@ -245,24 +322,19 @@
     $("trSh").setAttribute("transform", `translate(2.2 3.2) rotate(${aS})`);
 
     // lonž: od ruky trenéra ke karabině na hlavě koně
-    const hx = 9 * Math.cos(th) - 3.6 * Math.sin(th);
-    const hy = 9 * Math.sin(th) + 3.6 * Math.cos(th);
-    const Hx = LINE_R * Math.cos(th), Hy = LINE_R * Math.sin(th);
+    const hx = 9 * Math.cos(p.th) - 3.6 * Math.sin(p.th);
+    const hy = 9 * Math.sin(p.th) + 3.6 * Math.cos(p.th);
     const L = $("line"), LS = $("lineSh");
-    L.setAttribute("x1", hx);  L.setAttribute("y1", hy);  L.setAttribute("x2", Hx);  L.setAttribute("y2", Hy);
-    LS.setAttribute("x1", hx + 1.6); LS.setAttribute("y1", hy + 2.4); LS.setAttribute("x2", Hx + 1.6); LS.setAttribute("y2", Hy + 2.4);
+    L.setAttribute("x1", hx);  L.setAttribute("y1", hy);  L.setAttribute("x2", p.Hx);  L.setAttribute("y2", p.Hy);
+    LS.setAttribute("x1", hx + 1.6); LS.setAttribute("y1", hy + 2.4); LS.setAttribute("x2", p.Hx + 1.6); LS.setAttribute("y2", p.Hy + 2.4);
 
-    // kůň: hlava u konce lonže, tělo se táhne za ní po kruhu
-    const hd = th + Math.PI / 2 - BEND;
-    const ax = ATTACH[0] * SCALE, ay = ATTACH[1] * SCALE;
-    const bx = Hx - (ax * Math.cos(hd) - ay * Math.sin(hd));
-    const by = Hy - (ax * Math.sin(hd) + ay * Math.cos(hd));
-    const deg = hd * 180 / Math.PI;
-    $("horse").setAttribute("transform", `translate(${bx} ${by}) rotate(${deg}) scale(${SCALE})`);
-    $("horseSh").setAttribute("transform", `translate(${bx + 2.2} ${by + 3.2}) rotate(${deg}) scale(${SCALE})`);
+    // kůň
+    const deg = p.hd * 180 / Math.PI;
+    $("horse").setAttribute("transform", `translate(${p.bx} ${p.by}) rotate(${deg}) scale(${SCALE})`);
+    $("horseSh").setAttribute("transform", `translate(${p.bx + 2.2} ${p.by + 3.2}) rotate(${deg}) scale(${SCALE})`);
 
     // chůze: nohy v kroku, kývání hlavou a ocasem
-    const phase = REDUCE ? 0 : (d.getTime() / 1000) * 2 * Math.PI / 1.6;
+    const phase = REDUCE ? 0 : (nowMs / 1000) * 2 * Math.PI / (STRIDE_MS / 1000);
     for (const [el, x, y, off] of legs) {
       el.setAttribute("transform", `translate(${x + 7 * Math.sin(phase + off * 2 * Math.PI)} ${y})`);
     }
@@ -277,6 +349,273 @@
     else requestAnimationFrame(frame);
   }
   frame();
+
+  /* ---------- šmouhy v písku ---------- */
+  (function smudges() {
+    const clock = $("clock"), cv = $("smudge"), ctx = cv.getContext("2d");
+    const HOLD = 3000;      // nejdéle po 3 s začne šmouha mizet
+    const FADE = 700;       // jak dlouho mizí jeden bod šmouhy
+    const STEPS = 14;       // jemnost postupného mizení
+    const SAND_R = 98;      // kreslit lze jen na písku
+    const strokes = [];
+    const active = new Map();
+    let running = false;
+
+    function fit() {
+      const r = clock.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      cv.width = Math.max(1, Math.round(r.width * dpr));
+      cv.height = cv.width;
+    }
+    fit();
+    new ResizeObserver(fit).observe(clock);
+
+    function toUnits(e) {
+      const r = clock.getBoundingClientRect();
+      return [(e.clientX - r.left) / r.width * 284 - 142, (e.clientY - r.top) / r.height * 284 - 142];
+    }
+    function newStroke(x, y, t) {
+      const st = { pts: [{ x, y, t }, { x: x + 0.01, y, t }] };   // druhý bod kvůli tečce při kliknutí
+      strokes.push(st);
+      return st;
+    }
+    function addPoint(id, e) {
+      const [x, y] = toUnits(e);
+      const t = e.timeStamp || performance.now();
+      if (Math.hypot(x, y) > SAND_R) { active.set(id, null); return; }   // mimo písek se čára přeruší
+      const st = active.get(id);
+      if (!st) { active.set(id, newStroke(x, y, t)); return; }
+      const last = st.pts[st.pts.length - 1];
+      if (Math.hypot(x - last.x, y - last.y) < 0.5) return;
+      st.pts.push({ x, y, t });
+    }
+
+    clock.addEventListener("pointerdown", e => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      try { clock.setPointerCapture(e.pointerId); } catch (_) {}
+      active.set(e.pointerId, null);
+      addPoint(e.pointerId, e);
+      kick();
+    });
+    clock.addEventListener("pointermove", e => {
+      if (!active.has(e.pointerId)) return;
+      if (e.pointerType === "mouse" && !(e.buttons & 1)) { active.delete(e.pointerId); return; }
+      const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+      for (const ev of (list.length ? list : [e])) addPoint(e.pointerId, ev);
+    });
+    const end = e => active.delete(e.pointerId);
+    clock.addEventListener("pointerup", end);
+    clock.addEventListener("pointercancel", end);
+    clock.addEventListener("lostpointercapture", end);
+    clock.addEventListener("contextmenu", e => e.preventDefault());
+
+    function kick() { if (!running) { running = true; requestAnimationFrame(draw); } }
+
+    function draw() {
+      const now = performance.now();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      const k = cv.width / 284;
+      ctx.setTransform(k, 0, 0, k, 142 * k, 142 * k);
+      ctx.beginPath(); ctx.arc(0, 0, SAND_R + 1, 0, Math.PI * 2); ctx.clip();
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+
+      // úseky se řadí podle stáří: nejstarší (začátek čáry) mizí první
+      const buckets = new Array(STEPS + 1).fill(null);
+      for (let j = strokes.length - 1; j >= 0; j--) {
+        const pts = strokes[j].pts;
+        let alive = false;
+        for (let i = 1; i < pts.length; i++) {
+          const age = now - pts[i].t;
+          if (age >= HOLD + FADE) continue;
+          alive = true;
+          const b = age < HOLD ? 0 : Math.min(STEPS, 1 + Math.floor((age - HOLD) / (FADE / STEPS)));
+          const path = buckets[b] || (buckets[b] = new Path2D());
+          path.moveTo(pts[i - 1].x, pts[i - 1].y);
+          path.lineTo(pts[i].x, pts[i].y);
+        }
+        if (!alive && !Array.from(active.values()).includes(strokes[j])) strokes.splice(j, 1);
+      }
+      for (let b = 0; b <= STEPS; b++) {
+        const path = buckets[b];
+        if (!path) continue;
+        const a = b === 0 ? 1 : 1 - b / (STEPS + 1);
+        const w = 0.45 + 0.55 * a;                     // mizející šmouha se i zužuje
+        ctx.save(); ctx.translate(0.7, 0.8);
+        ctx.strokeStyle = `rgba(255,244,214,${0.42 * a})`; ctx.lineWidth = 8.2 * w; ctx.stroke(path);
+        ctx.restore();
+        ctx.strokeStyle = `rgba(112,82,46,${0.5 * a})`;   ctx.lineWidth = 6.2 * w; ctx.stroke(path);
+        ctx.strokeStyle = `rgba(88,60,30,${0.38 * a})`;   ctx.lineWidth = 3.0 * w; ctx.stroke(path);
+      }
+
+      if (strokes.length || active.size) requestAnimationFrame(draw);
+      else { running = false; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); }
+    }
+  })();
+
+  /* ---------- tráva kolem jízdárny (náhodné trsy, kreslí se jednou) ---------- */
+  (function lawn() {
+    const cv = $("lawn"), ctx = cv.getContext("2d"), clock = $("clock");
+    function rng(seed) {                      // stejné rozložení při každém otevření i po změně velikosti
+      return () => {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+    const pick = (r, a) => a[Math.floor(r() * a.length)];
+    const BLADE = ["#2f5a24", "#3b6a2b", "#4a7c33", "#5a8c3b", "#6b9c43", "#7fb04f"];
+    const OUTER = ["#33602a", "#3e6f2e", "#4a7c33", "#58893a"];
+    const INNER = ["#6b9c43", "#7fb04f", "#90c05a", "#a3cd68"];
+
+    function draw() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const W = window.innerWidth, H = window.innerHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+
+      const rc = clock.getBoundingClientRect();
+      const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2, u = rc.width / 284;
+      const r = rng(20261122);
+
+      // tráva roste jen mimo jízdárnu
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(cx, cy, 107 * u, 0, Math.PI * 2, true);
+      ctx.clip("evenodd");
+
+      // velké měkké skvrny světlejší a tmavší trávy
+      for (let i = 0; i < 16; i++) {
+        const x = r() * W, y = r() * H, rad = u * (40 + r() * 80), light = r() < 0.5;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+        const c = light ? "170,210,100" : "30,80,30";
+        g.addColorStop(0, `rgba(${c},${light ? 0.14 : 0.16})`);
+        g.addColorStop(1, `rgba(${c},0)`);
+        ctx.fillStyle = g; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+      }
+
+      // jemná stébla po celé trávě
+      ctx.lineCap = "round";
+      const blades = Math.floor(W * H / 55);
+      for (let i = 0; i < blades; i++) {
+        const x = r() * W, y = r() * H, a = r() * Math.PI * 2, L = u * (2.2 + r() * 3.6);
+        ctx.strokeStyle = pick(r, BLADE); ctx.globalAlpha = 0.22 + r() * 0.34;
+        ctx.lineWidth = 0.7 + r() * 0.6;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + Math.cos(a + 0.45) * L * 0.6, y + Math.sin(a + 0.45) * L * 0.6,
+                             x + Math.cos(a) * L, y + Math.sin(a) * L);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // trsy trávy, pohled shora: stébla rozbíhající se od středu
+      function leaf(x, y, a, L, w, bend, color) {
+        const px = -Math.sin(a), py = Math.cos(a);
+        const mx = x + Math.cos(a) * L * 0.5 + px * bend, my = y + Math.sin(a) * L * 0.5 + py * bend;
+        ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(mx + px * w, my + py * w, x + Math.cos(a) * L + px * bend * 0.6, y + Math.sin(a) * L + py * bend * 0.6);
+        ctx.quadraticCurveTo(mx - px * w, my - py * w, x, y);
+        ctx.fill();
+      }
+      const attempts = Math.floor(W * H / 7000);
+      for (let i = 0; i < attempts; i++) {
+        const R = u * (4.5 + r() * 4.5), x = r() * W, y = r() * H;
+        if (Math.hypot(x - cx, y - cy) < 140 * u + R) continue;       // nepřekrývat číslice a rysky
+        ctx.fillStyle = "rgba(20,40,10,.26)";
+        ctx.beginPath(); ctx.ellipse(x + R * 0.15, y + R * 0.22, R * 0.95, R * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+        const n = 9 + Math.floor(r() * 8), off = r() * Math.PI * 2;
+        for (let k = 0; k < n; k++) {
+          const a = off + (k / n) * Math.PI * 2 + (r() - 0.5) * 0.5;
+          leaf(x, y, a, R * (0.75 + r() * 0.3), R * 0.17, (r() - 0.5) * R * 0.45, pick(r, OUTER));
+        }
+        for (let k = 0; k < Math.ceil(n / 2); k++) {
+          const a = off + 0.3 + (k / (n / 2)) * Math.PI * 2 + (r() - 0.5) * 0.7;
+          leaf(x, y, a, R * (0.45 + r() * 0.25), R * 0.13, (r() - 0.5) * R * 0.3, pick(r, INNER));
+        }
+        ctx.fillStyle = "rgba(30,55,20,.55)";
+        ctx.beginPath(); ctx.arc(x, y, R * 0.14, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // luční kvítí: sedmikrásky, pryskyřníky, vlčí máky, chrpy, jetel a violky (pohled shora)
+      function petal(x, y, a, len, wid, color) {
+        ctx.fillStyle = color; ctx.beginPath();
+        ctx.ellipse(x + Math.cos(a) * len * 0.55, y + Math.sin(a) * len * 0.55, len * 0.55, wid, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      function dot(x, y, rad, color) {
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.fill();
+      }
+      const KINDS = {
+        daisy(x, y, R, o) {
+          const n = 11;
+          for (let k = 0; k < n; k++) petal(x, y, o + k / n * Math.PI * 2, R, R * 0.2, k % 2 ? "#fbfaf0" : "#f1efe2");
+          dot(x, y, R * 0.3, "#f2bf26"); dot(x - R * 0.06, y - R * 0.06, R * 0.14, "#f9dc66");
+        },
+        buttercup(x, y, R, o) {
+          for (let k = 0; k < 5; k++) {
+            const a = o + k / 5 * Math.PI * 2;
+            dot(x + Math.cos(a) * R * 0.45, y + Math.sin(a) * R * 0.45, R * 0.42, "#f6d22e");
+          }
+          dot(x, y, R * 0.28, "#d9a613");
+        },
+        poppy(x, y, R, o) {
+          for (let k = 0; k < 4; k++) {
+            const a = o + k / 4 * Math.PI * 2 + 0.4;
+            dot(x + Math.cos(a) * R * 0.42, y + Math.sin(a) * R * 0.42, R * 0.56, k % 2 ? "#d52f28" : "#e5463a");
+          }
+          dot(x, y, R * 0.24, "#2b1515");
+          for (let k = 0; k < 6; k++) { const a = o + k; dot(x + Math.cos(a) * R * 0.3, y + Math.sin(a) * R * 0.3, R * 0.05, "#111"); }
+        },
+        cornflower(x, y, R, o) {
+          const n = 9;
+          for (let k = 0; k < n; k++) petal(x, y, o + k / n * Math.PI * 2, R, R * 0.17, k % 2 ? "#4a6fd1" : "#6a8ae6");
+          dot(x, y, R * 0.22, "#27368a");
+        },
+        clover(x, y, R, o) {
+          for (let k = 0; k < 9; k++) {
+            const a = o + k * 2.4, d = R * 0.5 * Math.sqrt((k + 1) / 9);
+            dot(x + Math.cos(a) * d, y + Math.sin(a) * d, R * 0.3, k % 2 ? "#d889b5" : "#c56aa2");
+          }
+        },
+        violet(x, y, R, o) {
+          for (let k = 0; k < 5; k++) {
+            const a = o + k / 5 * Math.PI * 2;
+            dot(x + Math.cos(a) * R * 0.42, y + Math.sin(a) * R * 0.42, R * 0.4, k < 2 ? "#8c63c4" : "#a07ad4");
+          }
+          dot(x, y, R * 0.18, "#f5e27a");
+        }
+      };
+      const SIZE = { daisy: [2.0, 3.0], buttercup: [1.6, 2.4], poppy: [2.4, 3.4], cornflower: [1.9, 2.7], clover: [2.0, 2.8], violet: [1.5, 2.2] };
+      const names = Object.keys(KINDS);
+      function flower(kind, x, y) {
+        const R = 1.35 * u * (SIZE[kind][0] + r() * (SIZE[kind][1] - SIZE[kind][0]));
+        if (Math.hypot(x - cx, y - cy) < 140 * u + R) return;
+        ctx.fillStyle = "rgba(20,40,10,.28)";
+        ctx.beginPath(); ctx.ellipse(x + R * 0.18, y + R * 0.26, R * 0.95, R * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+        KINDS[kind](x, y, R, r() * Math.PI * 2);
+      }
+      // jednotlivé kvítky rozesety náhodně
+      const singles = Math.floor(W * H / 9000);
+      for (let i = 0; i < singles; i++) flower(pick(r, names), r() * W, r() * H);
+      // kvetoucí loučky: skupinky jednoho druhu
+      const patches = Math.floor(W * H / 38000) + 2;
+      for (let i = 0; i < patches; i++) {
+        const kind = pick(r, names), px = r() * W, py = r() * H, cnt = 4 + Math.floor(r() * 6);
+        for (let k = 0; k < cnt; k++) {
+          const a = r() * Math.PI * 2, d = u * 15 * Math.sqrt(r());
+          flower(kind, px + Math.cos(a) * d, py + Math.sin(a) * d);
+        }
+      }
+      ctx.restore();
+    }
+
+    let queued = false;
+    const redraw = () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; draw(); }); } };
+    draw();
+    new ResizeObserver(redraw).observe(clock);
+    window.addEventListener("resize", redraw);
+  })();
 </script>
 </body>
 </html>
