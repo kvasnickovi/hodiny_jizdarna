@@ -18,6 +18,51 @@
     content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .5;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .12  0 0 0 0 .26  0 0 0 0 .06  0 0 0 .55 -.18'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
   }
+  .picker {
+    position: fixed; z-index: 30;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: calc(env(safe-area-inset-left, 0px) + 12px);
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px 6px 14px; border-radius: 999px;
+    background: rgba(40, 28, 14, .72); color: #fff4e0;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    box-shadow: 0 2px 10px rgba(0,0,0,.25); white-space: nowrap;
+    font: 600 14px "Avenir Next", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+  .picker select {
+    font: inherit; color: #fff4e0; cursor: pointer;
+    background: rgba(255,255,255,.14) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23fff4e0' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+    border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
+    padding: 5px 30px 5px 12px;
+    -webkit-appearance: none; appearance: none;
+  }
+  .picker select option { color: #2a1c0c; background: #fff; }
+  @media (max-aspect-ratio: 1/1) { .picker { left: 50%; transform: translateX(-50%); } }
+
+  #tip {
+    position: fixed; z-index: 40; left: 0; top: 0; pointer-events: none;
+    width: max-content; max-width: min(280px, calc(100vw - 16px));
+    padding: 10px 12px; border-radius: 12px;
+    background: #fffaf0; color: #3a2a14; border: 1px solid #c9a96f;
+    box-shadow: 0 6px 18px rgba(0,0,0,.28);
+    font: 400 13px/1.4 "Avenir Next", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    opacity: 0; visibility: hidden; transition: opacity .12s;
+  }
+  #tip.on { opacity: 1; visibility: visible; }
+  #tip strong { display: block; margin-bottom: 3px; font-size: 14px; }
+  #tip .arrow {
+    position: absolute; width: 12px; height: 12px; background: #fffaf0;
+    border: 1px solid #c9a96f; transform: translateX(-50%) rotate(45deg);
+  }
+  #tip.up .arrow { bottom: -7px; border-top: 0; border-left: 0; }
+  #tip.down .arrow { top: -7px; border-bottom: 0; border-right: 0; }
+
+  /* vzory srsti podle zvolené barvy */
+  #fg:not([data-coat="strakos"]) .pinto,
+  #fg:not([data-coat="hermelin"]) .spots,
+  #fg:not([data-coat="belous"]) .dapple,
+  #fg:not([data-coat="plavak"]) .stripe { display: none; }
+
   #lawn { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .stage {
     position: fixed; inset: 0;
@@ -89,10 +134,15 @@
           <rect width="6" height="8" fill="#2f5f9e"/><rect x="6" width="6" height="8" fill="#f3ede0"/>
         </pattern>
         <linearGradient id="bay" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#5a3016"/>
-          <stop offset=".5" stop-color="#8a5530"/>
-          <stop offset="1" stop-color="#5a3016"/>
+          <stop offset="0" style="stop-color:var(--h-edge)"/>
+          <stop offset=".5" style="stop-color:var(--h-mid)"/>
+          <stop offset="1" style="stop-color:var(--h-edge)"/>
         </linearGradient>
+        <clipPath id="clipBody"><path d="M-40 0 C-40 -12 -30 -15 -18 -14 C-6 -13 6 -14 18 -13 C28 -12 32 -8 34 -4 L34 4 C32 8 28 12 18 13 C6 14 -6 13 -18 14 C-30 15 -40 12 -40 0Z"/></clipPath>
+        <clipPath id="clipNeck">
+          <path d="M30 -6.5 C40 -6 46 -5 53 -4.5 L52 5 C46 7 40 8 30 7Z"/>
+          <path d="M52 -4.5 C62 -5 72 -2.5 82 1.5 C85 3 85 7 82 8 C72 9 62 10 52 5Z"/>
+        </clipPath>
         <g id="shoe" fill="none" stroke-linecap="round" stroke-width="1.2">
           <path d="M-2.1 -2.1 C.8 -2.9 2.5 -1.5 2.5 0 C2.5 1.5 .8 2.9 -2.1 2.1" stroke="#fff3d6" stroke-opacity=".5" transform="translate(.45 .45)"/>
           <path d="M-2.1 -2.1 C.8 -2.9 2.5 -1.5 2.5 0 C2.5 1.5 .8 2.9 -2.1 2.1" stroke="#6b4721"/>
@@ -149,24 +199,26 @@
 
       <!-- kůň, pohled shora (hlavou doprava) -->
       <g id="horse">
-        <g id="legs" fill="#2c170d">
+        <g id="legs" style="fill:var(--h-leg)">
           <rect id="lHL" x="-5" y="-2" width="10" height="4" rx="2"/>
           <rect id="lFL" x="-5" y="-2" width="10" height="4" rx="2"/>
           <rect id="lHR" x="-5" y="-2" width="10" height="4" rx="2"/>
           <rect id="lFR" x="-5" y="-2" width="10" height="4" rx="2"/>
         </g>
-        <g id="tail" fill="#26140c">
+        <g id="tail" style="fill:var(--h-mane)">
           <path d="M-38 -1 C-52 -5 -64 -3 -76 5 C-64 4 -54 9 -38 4 Z"/>
         </g>
         <path d="M-40 0 C-40 -12 -30 -15 -18 -14 C-6 -13 6 -14 18 -13 C28 -12 32 -8 34 -4 L34 4 C32 8 28 12 18 13 C6 14 -6 13 -18 14 C-30 15 -40 12 -40 0Z" fill="url(#bay)"/>
+        <g id="coatBody" clip-path="url(#clipBody)"></g>
         <ellipse cx="-4" cy="0" rx="30" ry="5.5" fill="#ffd9a0" opacity=".16"/>
         <g id="neckg">
           <path d="M30 -6.5 C40 -6 46 -5 53 -4.5 L52 5 C46 7 40 8 30 7Z" fill="url(#bay)"/>
-          <path d="M30 -1.5 C40 -1 46 -.5 53 -.5 L53 1.8 C46 1.8 40 2.2 30 2.2Z" fill="#26140c"/>
           <path d="M52 -4.5 C62 -5 72 -2.5 82 1.5 C85 3 85 7 82 8 C72 9 62 10 52 5Z" fill="url(#bay)"/>
-          <ellipse cx="55" cy="-2.6" rx="3.1" ry="1.3" transform="rotate(-10 55 -2.6)" fill="#3b2012"/>
-          <ellipse cx="55" cy="3.6" rx="3.1" ry="1.3" transform="rotate(10 55 3.6)" fill="#3b2012"/>
-          <ellipse cx="81" cy="5.2" rx="3.2" ry="2.6" fill="#4a2a1a"/>
+          <g id="coatNeck" clip-path="url(#clipNeck)"></g>
+          <path d="M30 -1.5 C40 -1 46 -.5 53 -.5 L53 1.8 C46 1.8 40 2.2 30 2.2Z" style="fill:var(--h-mane)"/>
+          <ellipse cx="55" cy="-2.6" rx="3.1" ry="1.3" transform="rotate(-10 55 -2.6)" style="fill:var(--h-ear)"/>
+          <ellipse cx="55" cy="3.6" rx="3.1" ry="1.3" transform="rotate(10 55 3.6)" style="fill:var(--h-ear)"/>
+          <ellipse cx="81" cy="5.2" rx="3.2" ry="2.6" style="fill:var(--h-muzzle)"/>
           <path d="M72.5 -1 C74 3 74 6 72.8 9.2" fill="none" stroke="#1b1b1b" stroke-width="1.1"/>
           <circle cx="75" cy="8.8" r="1.4" fill="#d3b87a"/>
         </g>
@@ -174,6 +226,22 @@
     </svg>
   </div>
 </main>
+
+<div class="picker">
+  <label for="coat">Barva koně</label>
+  <select id="coat">
+    <option value="hnedak">Hnědák</option>
+    <option value="ryzak">Ryzák</option>
+    <option value="vranik">Vraník</option>
+    <option value="belous">Bělouš</option>
+    <option value="plavak">Plavák</option>
+    <option value="isabela">Isabela</option>
+    <option value="strakos">Strakoš</option>
+    <option value="hermelin">Hermelín</option>
+    <option value="albin">Albín</option>
+  </select>
+</div>
+<div id="tip" role="tooltip"><strong id="tipT"></strong><span id="tipD"></span><i class="arrow"></i></div>
 
 <script>
   const NS = "http://www.w3.org/2000/svg";
@@ -232,6 +300,20 @@
   const ATTACH = [75, 8.8];    // karabina na ohlávce
   const BEND = 0.5;            // zakřivení koně po kruhu
   const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let horsePose = null;        // aktuální poloha koně (pro nápovědu a klikání)
+
+  // leží bod obrazovky na těle koně?
+  function horseHit(clientX, clientY, margin) {
+    if (!horsePose) return false;
+    const r = $("clock").getBoundingClientRect();
+    const dx = (clientX - r.left) / r.width * 284 - 142 - horsePose.bx;
+    const dy = (clientY - r.top) / r.height * 284 - 142 - horsePose.by;
+    const c = Math.cos(horsePose.hd), sn = Math.sin(horsePose.hd);
+    const lx = (dx * c + dy * sn) / SCALE, ly = (-dx * sn + dy * c) / SCALE;
+    const m = margin || 3;
+    if (lx >= -42 - m && lx <= 36 + m && Math.abs(ly) <= 16 + m) return true;      // trup
+    return lx >= 28 && lx <= 86 + m && ly >= -9 - m && ly <= 12 + m;                // krk a hlava
+  }
 
   const legs = [
     [$("lHL"), -26, -14, 0.00],
@@ -329,6 +411,8 @@
     LS.setAttribute("x1", hx + 1.6); LS.setAttribute("y1", hy + 2.4); LS.setAttribute("x2", p.Hx + 1.6); LS.setAttribute("y2", p.Hy + 2.4);
 
     // kůň
+    horsePose = { bx: p.bx, by: p.by, hd: p.hd };
+    if (window.tipUpdate) window.tipUpdate();
     const deg = p.hd * 180 / Math.PI;
     $("horse").setAttribute("transform", `translate(${p.bx} ${p.by}) rotate(${deg}) scale(${SCALE})`);
     $("horseSh").setAttribute("transform", `translate(${p.bx + 2.2} ${p.by + 3.2}) rotate(${deg}) scale(${SCALE})`);
@@ -392,6 +476,7 @@
 
     clock.addEventListener("pointerdown", e => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (horseHit(e.clientX, e.clientY, e.pointerType === "touch" ? 6 : 3)) return;
       try { clock.setPointerCapture(e.pointerId); } catch (_) {}
       active.set(e.pointerId, null);
       addPoint(e.pointerId, e);
@@ -615,6 +700,109 @@
     draw();
     new ResizeObserver(redraw).observe(clock);
     window.addEventListener("resize", redraw);
+  })();
+
+  /* ---------- barva koně a bublinová nápověda ---------- */
+  (function coats() {
+    const COATS = {
+      hnedak:  { name: "Hnědák", edge: "#5a3016", mid: "#8a5530", leg: "#17100e", mane: "#120b09", ear: "#1c1210", muzzle: "#3a2418",
+                 desc: "Má hnědou srst různých odstínů (od světlé po černohnědou), ale hříva, ocas a spodky končetin jsou vždy černé." },
+      ryzak:   { name: "Ryzák", edge: "#8f3d17", mid: "#c4642d", leg: "#b45a28", mane: "#a8501f", ear: "#a24b1c", muzzle: "#9a4a22",
+                 desc: "Srst je zrzavá až červenohnědá. Hříva, ocas a spodky končetin mají stejnou barvu jako tělo, případně jsou světlejší (nikdy nejsou černé)." },
+      vranik:  { name: "Vraník", edge: "#0a0a0c", mid: "#2a2a30", leg: "#0d0d0f", mane: "#08080a", ear: "#0f0f12", muzzle: "#1b1b1f",
+                 desc: "Celé tělo, hříva, ocas i končetiny jsou sytě černé." },
+      belous:  { name: "Bělouš", edge: "#a4a8ad", mid: "#dcdddd", leg: "#c4c7ca", mane: "#e6e7e6", ear: "#b8bbbf", muzzle: "#8e9297",
+                 desc: "Má bílou nebo prošedivělou srst. Dělí se na vybělující (rodí se tmaví a věkem bělají) a nevybělující (rodí se bílí)." },
+      plavak:  { name: "Plavák", edge: "#a58a5c", mid: "#d2b684", leg: "#1a1410", mane: "#17120f", ear: "#3a2c20", muzzle: "#5a4630",
+                 desc: "Srst je žlutavá, písková až šedavá, zatímco hříva, ocas a spodky končetin jsou černé. Často má takzvaný úhoří pruh na hřbetě." },
+      isabela: { name: "Isabela (žluťák / palomino)", edge: "#c9953a", mid: "#ebc060", leg: "#dfb057", mane: "#f6efdc", ear: "#d9a64a", muzzle: "#d8a574",
+                 desc: "Srst má žlutou až zlatavou barvu a hříva s ocasem jsou bílé, krémové nebo světle žluté." },
+      strakos: { name: "Strakoš", edge: "#5a3016", mid: "#8a5530", leg: "#3a2418", mane: "#1c110c", ear: "#2a1a12", muzzle: "#4a2a1a",
+                 desc: "Na těle se střídají velké nepigmentované bílé plochy s plochami jiné základní barvy (např. hnědo-bílý, černo-bílý)." },
+      hermelin:{ name: "Hermelín (tygr)", edge: "#cbbfa4", mid: "#f4eddb", leg: "#e8dfc8", mane: "#cfc6b0", ear: "#dccfb6", muzzle: "#8f7d6a",
+                 desc: "Základní srst je bílá nebo světlá a po těle jsou rozesety malé tmavé skvrny." },
+      albin:   { name: "Albín", edge: "#d6cdbf", mid: "#fcf8f1", leg: "#f2ebe0", mane: "#f6f2ea", ear: "#efd9d2", muzzle: "#e8b4b0",
+                 desc: "Zvíře zcela bez pigmentu s bílou srstí, růžovou kůží a červenýma nebo modrýma očima (v praxi jde o vzácnost, často se za něj zaměňuje velmi světlá isabela)." }
+    };
+
+    // vzory srsti (strakatost, skvrny, kropenatost, úhoří pruh) – nakreslí se jednou
+    (function buildPatterns() {
+      let seed = 7;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const body = $("coatBody"), neck = $("coatNeck");
+      const add = (parent, cls, tag, attrs) => {
+        let g = parent.querySelector("." + cls);
+        if (!g) { g = mk("g", { class: cls }, parent); }
+        return mk(tag, attrs, g);
+      };
+      // strakoš: velké bílé plochy
+      ["M-42 -17 C-24 -19 -8 -11 -12 2 C-16 13 -34 15 -44 8 Z",
+       "M2 -17 C14 -19 25 -13 23 -3 C21 6 7 4 -2 -2 C-6 -8 -4 -15 2 -17 Z",
+       "M-8 9 C4 6 16 8 22 15 L-10 17 Z"].forEach(d => add(body, "pinto", "path", { d, fill: "#f7f3ea" }));
+      add(neck, "pinto", "path", { d: "M29 -8 C40 -8 46 -4 48 0 C44 5 36 8 29 8 Z", fill: "#f7f3ea" });
+      add(neck, "pinto", "path", { d: "M58 -3 C68 -3 78 0 86 3 C84 9 70 8 58 5 Z", fill: "#f7f3ea" });
+      // hermelín: drobné tmavé skvrny
+      for (let i = 0; i < 80; i++) add(body, "spots", "circle", { cx: -42 + rnd() * 78, cy: -16 + rnd() * 32, r: 0.8 + rnd() * 1.7, fill: "#3b2b22", opacity: .85 });
+      for (let i = 0; i < 16; i++) add(neck, "spots", "circle", { cx: 29 + rnd() * 56, cy: -7 + rnd() * 16, r: 0.6 + rnd() * 1.1, fill: "#3b2b22", opacity: .85 });
+      // bělouš: jemné kruhy (jablka)
+      for (let i = 0; i < 40; i++) add(body, "dapple", "circle", { cx: -42 + rnd() * 78, cy: -16 + rnd() * 32, r: 2.4 + rnd() * 2.2, fill: "#8c9096", opacity: .2 });
+      for (let i = 0; i < 8; i++) add(neck, "dapple", "circle", { cx: 29 + rnd() * 50, cy: -7 + rnd() * 15, r: 1.8 + rnd() * 1.4, fill: "#8c9096", opacity: .2 });
+      // plavák: úhoří pruh podél hřbetu
+      add(body, "stripe", "path", { d: "M-41 0 L33 0", stroke: "#3a2a1c", "stroke-width": 2.4, "stroke-linecap": "round", opacity: .8, fill: "none" });
+    })();
+
+    const fg = $("fg"), sel = $("coat"), tip = $("tip");
+    const tipT = $("tipT"), tipD = $("tipD");
+    function apply(key) {
+      const c = COATS[key] || COATS.hnedak;
+      const st = fg.style;
+      st.setProperty("--h-edge", c.edge);   st.setProperty("--h-mid", c.mid);
+      st.setProperty("--h-leg", c.leg);     st.setProperty("--h-mane", c.mane);
+      st.setProperty("--h-ear", c.ear);     st.setProperty("--h-muzzle", c.muzzle);
+      fg.dataset.coat = key;
+      tipT.textContent = c.name; tipD.textContent = c.desc;
+    }
+    let saved = null;
+    try { saved = localStorage.getItem("kun-barva"); } catch (_) {}
+    if (saved && COATS[saved]) sel.value = saved;
+    apply(sel.value);
+    sel.addEventListener("change", () => {
+      apply(sel.value);
+      try { localStorage.setItem("kun-barva", sel.value); } catch (_) {}
+    });
+
+    // nápověda: myš nad tělem koně, na dotyku klepnutí na koně
+    const clock = $("clock");
+    const mouse = { x: 0, y: 0, in: false };
+    let touchUntil = 0;
+    clock.addEventListener("pointermove", e => {
+      if (e.pointerType !== "mouse") return;
+      mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true;
+      window.tipUpdate();
+    });
+    clock.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") { mouse.in = false; window.tipUpdate(); } });
+    clock.addEventListener("pointerdown", e => {
+      if (e.pointerType === "mouse") return;
+      touchUntil = horseHit(e.clientX, e.clientY, 8) ? performance.now() + 6000 : 0;
+      window.tipUpdate();
+    });
+    window.addEventListener("blur", () => { mouse.in = false; });
+
+    window.tipUpdate = function () {
+      const show = horsePose && ((mouse.in && horseHit(mouse.x, mouse.y, 3)) || performance.now() < touchUntil);
+      if (!show) { tip.classList.remove("on"); return; }
+      const r = clock.getBoundingClientRect();
+      const cx = r.left + (horsePose.bx + 142) / 284 * r.width;
+      const cy = r.top + (horsePose.by + 142) / 284 * r.height;
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      const left = Math.min(Math.max(8, cx - w / 2), window.innerWidth - w - 8);
+      let top = cy - h - 26, dir = "up";
+      if (top < 8) { top = cy + 26; dir = "down"; }
+      tip.style.transform = `translate(${left}px, ${top}px)`;
+      tip.querySelector(".arrow").style.left = Math.min(Math.max(16, cx - left), w - 16) + "px";
+      tip.classList.toggle("up", dir === "up"); tip.classList.toggle("down", dir === "down");
+      tip.classList.add("on");
+    };
   })();
 </script>
 </body>
